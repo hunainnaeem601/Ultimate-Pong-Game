@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Pong Game — Deluxe</title>
+<!-- Firebase SDK: powers the cross-device, cross-host comment board.
+     Only used if you fill in firebaseConfig below with your own free project. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
     .mobile-controls {
         display: flex;
@@ -1216,6 +1220,42 @@
     const p2UpBtn = document.getElementById('p2UpBtn');
     const p2DownBtn = document.getElementById('p2DownBtn');
 
+    // ---------- Real cross-device comment board (Firebase Firestore) ----------
+    // 1. Go to https://console.firebase.google.com and create a free project.
+    // 2. In the project, open "Firestore Database" and click "Create database"
+    //    (start in test mode is fine for a simple guestbook like this).
+    // 3. Project settings (gear icon) -> "Your apps" -> add a Web app -> copy
+    //    the config object it gives you and paste the values below.
+    // 4. Re-upload/host this file. Comments will then be visible to EVERY
+    //    visitor on ANY device, anywhere this file is hosted — not just here.
+    // Until you fill this in, comments fall back to Claude's built-in shared
+    // storage, which only works while viewing this exact Claude artifact.
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    let useFirebase = false;
+    let firestoreDb = null;
+
+    function tryInitFirebase() {
+        try {
+            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && window.firebase) {
+                firebase.initializeApp(firebaseConfig);
+                firestoreDb = firebase.firestore();
+                useFirebase = true;
+            }
+        } catch (e) {
+            console.error('Firebase init failed — falling back to local shared storage', e);
+            useFirebase = false;
+        }
+    }
+    tryInitFirebase();
+
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
     const WIN_SCORE = 11;
@@ -1394,6 +1434,8 @@
     }
 
     async function loadComments() {
+        // Fallback path only (used when Firebase isn't configured): Claude's
+        // built-in shared artifact storage.
         try {
             if (window.storage) {
                 const res = await window.storage.get('pong-comments', true);
@@ -1405,13 +1447,57 @@
         return [];
     }
 
-    async function saveComments() {
-        try {
-            if (window.storage) {
-                await window.storage.set('pong-comments', JSON.stringify(comments.slice(-50)), true);
+    function subscribeComments() {
+        if (useFirebase && firestoreDb) {
+            // Live listener: every visitor, on any device, sees new comments
+            // appear automatically — this is the real cross-host guestbook.
+            firestoreDb.collection('pong-comments')
+                .orderBy('createdAt', 'desc')
+                .limit(50)
+                .onSnapshot(function (snapshot) {
+                    comments = snapshot.docs.map(doc => {
+                        const d = doc.data();
+                        return { name: d.name, text: d.text, time: d.time };
+                    }).reverse();
+                    if (menuOverlay.dataset.state === 'comments') {
+                        showMenu('comments');
+                    }
+                }, function (err) {
+                    console.error('Comments listener error', err);
+                });
+        } else {
+            loadComments().then(function (loaded) {
+                comments = loaded;
+            });
+        }
+    }
+
+    async function postComment(name, text) {
+        const entry = { name, text, time: new Date().toLocaleDateString() };
+        if (useFirebase && firestoreDb) {
+            try {
+                await firestoreDb.collection('pong-comments').add({
+                    name: entry.name,
+                    text: entry.text,
+                    time: entry.time,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                // The onSnapshot listener above will refresh the list and
+                // re-render automatically once the write lands.
+            } catch (e) {
+                console.error('Could not post comment to Firebase', e);
+                showToast('Could not post comment — check connection', 2200);
             }
-        } catch (e) {
-            console.error('Could not save comment', e);
+        } else {
+            comments.push(entry);
+            try {
+                if (window.storage) {
+                    await window.storage.set('pong-comments', JSON.stringify(comments.slice(-50)), true);
+                }
+            } catch (e) {
+                console.error('Could not save comment', e);
+            }
+            showMenu('comments');
         }
     }
 
@@ -2331,9 +2417,12 @@
                     </div>
                 `).join('')
                 : `<div class="comment-empty">No comments yet — be the first!</div>`;
+            const statusMsg = useFirebase
+                ? '🟢 Live — visible to everyone, on any device, anywhere this game is hosted'
+                : '🟡 Local preview only — add a Firebase config to make this public (see code comments)';
             return `
                 <div class="menu-title small">💬 COMMENTS</div>
-                <div class="menu-stats">Visible to everyone who plays this game</div>
+                <div class="menu-stats">${statusMsg}</div>
                 <div class="comment-list">${list}</div>
                 <input type="text" id="commentName" class="comment-input" placeholder="Your name (optional)" maxlength="24">
                 <textarea id="commentText" class="comment-input comment-textarea" placeholder="Say something about the game..." maxlength="200"></textarea>
@@ -2408,9 +2497,7 @@
                 if (textEl) textEl.focus();
                 return;
             }
-            comments.push({ name, text, time: new Date().toLocaleDateString() });
-            saveComments();
-            showMenu('comments');
+            postComment(name, text);
         }
     });
 
@@ -2593,7 +2680,7 @@
     scheduleMusic();
     (async function initStats() {
         stats = await loadStats();
-        comments = await loadComments();
+        subscribeComments();
         showMenu('main');
     })();
 })();
