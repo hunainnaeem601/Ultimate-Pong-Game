@@ -4,10 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Pong Game — Deluxe</title>
-<!-- Firebase SDK: powers the cross-device, cross-host comment board.
-     Only used if you fill in firebaseConfig below with your own free project. -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
     .mobile-controls {
         display: flex;
@@ -781,6 +777,52 @@
         resize: vertical;
     }
 
+    .page-comments {
+        max-width: 620px;
+        margin: 0 auto 24px;
+        text-align: left;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #2b3560;
+        border-radius: 14px;
+        padding: 16px 18px;
+    }
+
+    .page-comments-title {
+        font-size: 0.9rem;
+        letter-spacing: 0.05rem;
+        color: var(--accent);
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+
+    .page-comments-sub {
+        font-size: 0.7rem;
+        letter-spacing: 0.02rem;
+        color: var(--muted);
+        font-weight: normal;
+    }
+
+    .page-comments .comment-list {
+        max-height: 220px;
+        margin-bottom: 10px;
+    }
+
+    .page-comment-form {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    body.game-active .page-comments {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .page-comments {
+            margin-bottom: 90px;
+        }
+    }
+
     @media (max-width: 768px) {
     body {
         padding-bottom: calc(88px + env(safe-area-inset-bottom));
@@ -1174,6 +1216,16 @@
             <button id="commentsBtn" class="icon-btn">💬 Comments</button>
             <button id="settingsBtn" class="icon-btn">⚙️ Settings</button>
         </div>
+
+        <div class="page-comments" id="pageComments">
+            <div class="page-comments-title">💬 Player Comments <span class="page-comments-sub">— visible to everyone who plays this game</span></div>
+            <div class="comment-list" id="pageCommentList"></div>
+            <div class="page-comment-form">
+                <input type="text" id="pageCommentName" class="comment-input" placeholder="Your name (optional)" maxlength="24">
+                <textarea id="pageCommentText" class="comment-input comment-textarea" placeholder="Say something about the game..." maxlength="200"></textarea>
+                <button class="start-btn" id="pageCommentPostBtn" style="padding:10px 28px;font-size:0.85rem;">POST COMMENT</button>
+            </div>
+        </div>
     </div>
 
 <script>
@@ -1210,6 +1262,10 @@
     const rotateHintClose = document.getElementById('rotateHintClose');
     const commentsBtn = document.getElementById('commentsBtn');
     const settingsBtn = document.getElementById('settingsBtn');
+    const pageCommentList = document.getElementById('pageCommentList');
+    const pageCommentName = document.getElementById('pageCommentName');
+    const pageCommentText = document.getElementById('pageCommentText');
+    const pageCommentPostBtn = document.getElementById('pageCommentPostBtn');
     const toastEl = document.getElementById('toastEl');
     const container = document.querySelector('.container');
     const p1PadGroup = document.getElementById('p1PadGroup');
@@ -1219,42 +1275,6 @@
     const p1DownBtn = document.getElementById('p1DownBtn');
     const p2UpBtn = document.getElementById('p2UpBtn');
     const p2DownBtn = document.getElementById('p2DownBtn');
-
-    // ---------- Real cross-device comment board (Firebase Firestore) ----------
-    // 1. Go to https://console.firebase.google.com and create a free project.
-    // 2. In the project, open "Firestore Database" and click "Create database"
-    //    (start in test mode is fine for a simple guestbook like this).
-    // 3. Project settings (gear icon) -> "Your apps" -> add a Web app -> copy
-    //    the config object it gives you and paste the values below.
-    // 4. Re-upload/host this file. Comments will then be visible to EVERY
-    //    visitor on ANY device, anywhere this file is hosted — not just here.
-    // Until you fill this in, comments fall back to Claude's built-in shared
-    // storage, which only works while viewing this exact Claude artifact.
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    };
-
-    let useFirebase = false;
-    let firestoreDb = null;
-
-    function tryInitFirebase() {
-        try {
-            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && window.firebase) {
-                firebase.initializeApp(firebaseConfig);
-                firestoreDb = firebase.firestore();
-                useFirebase = true;
-            }
-        } catch (e) {
-            console.error('Firebase init failed — falling back to local shared storage', e);
-            useFirebase = false;
-        }
-    }
-    tryInitFirebase();
 
     const WIDTH = canvas.width;
     const HEIGHT = canvas.height;
@@ -1434,8 +1454,6 @@
     }
 
     async function loadComments() {
-        // Fallback path only (used when Firebase isn't configured): Claude's
-        // built-in shared artifact storage.
         try {
             if (window.storage) {
                 const res = await window.storage.get('pong-comments', true);
@@ -1447,59 +1465,67 @@
         return [];
     }
 
-    function subscribeComments() {
-        if (useFirebase && firestoreDb) {
-            // Live listener: every visitor, on any device, sees new comments
-            // appear automatically — this is the real cross-host guestbook.
-            firestoreDb.collection('pong-comments')
-                .orderBy('createdAt', 'desc')
-                .limit(50)
-                .onSnapshot(function (snapshot) {
-                    comments = snapshot.docs.map(doc => {
-                        const d = doc.data();
-                        return { name: d.name, text: d.text, time: d.time };
-                    }).reverse();
-                    if (menuOverlay.dataset.state === 'comments') {
-                        showMenu('comments');
-                    }
-                }, function (err) {
-                    console.error('Comments listener error', err);
-                });
-        } else {
-            loadComments().then(function (loaded) {
-                comments = loaded;
-            });
+    async function saveComments() {
+        try {
+            if (window.storage) {
+                await window.storage.set('pong-comments', JSON.stringify(comments.slice(-50)), true);
+            }
+        } catch (e) {
+            console.error('Could not save comment', e);
         }
     }
 
-    async function postComment(name, text) {
-        const entry = { name, text, time: new Date().toLocaleDateString() };
-        if (useFirebase && firestoreDb) {
-            try {
-                await firestoreDb.collection('pong-comments').add({
-                    name: entry.name,
-                    text: entry.text,
-                    time: entry.time,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                // The onSnapshot listener above will refresh the list and
-                // re-render automatically once the write lands.
-            } catch (e) {
-                console.error('Could not post comment to Firebase', e);
-                showToast('Could not post comment — check connection', 2200);
-            }
-        } else {
-            comments.push(entry);
-            try {
-                if (window.storage) {
-                    await window.storage.set('pong-comments', JSON.stringify(comments.slice(-50)), true);
-                }
-            } catch (e) {
-                console.error('Could not save comment', e);
-            }
-            showMenu('comments');
-        }
+    function commentListHTML() {
+        return comments.length
+            ? comments.slice().reverse().map(c => `
+                <div class="comment-item">
+                    <div class="comment-head"><strong>${escapeHTML(c.name)}</strong><span>${escapeHTML(c.time)}</span></div>
+                    <div class="comment-text">${escapeHTML(c.text)}</div>
+                </div>
+            `).join('')
+            : `<div class="comment-empty">No comments yet — be the first!</div>`;
     }
+
+    function renderPageComments() {
+        if (pageCommentList) pageCommentList.innerHTML = commentListHTML();
+        // Keep the popup comments modal in sync too, if it happens to be open.
+        if (menuOverlay.dataset.state === 'comments') showMenu('comments');
+    }
+
+    async function postNewComment(name, text) {
+        const cleanName = (name || '').trim().slice(0, 24) || 'Anonymous';
+        const cleanText = (text || '').trim().slice(0, 200);
+        if (!cleanText) return false;
+        comments.push({ name: cleanName, text: cleanText, time: new Date().toLocaleDateString() });
+        await saveComments();
+        renderPageComments();
+        return true;
+    }
+
+    if (pageCommentPostBtn) {
+        pageCommentPostBtn.addEventListener('click', async function () {
+            ensureAudio();
+            sfxClick();
+            const posted = await postNewComment(pageCommentName.value, pageCommentText.value);
+            if (posted) {
+                pageCommentText.value = '';
+            } else {
+                pageCommentText.focus();
+            }
+        });
+    }
+
+    // Poll for new comments from other players every so often so this feels "live"
+    // without needing a page refresh.
+    setInterval(async function () {
+        try {
+            const latest = await loadComments();
+            if (JSON.stringify(latest) !== JSON.stringify(comments)) {
+                comments = latest;
+                renderPageComments();
+            }
+        } catch (e) { /* ignore transient errors */ }
+    }, 20000);
 
     // ---------- Screenshot / score card download ----------
     function downloadScreenshot() {
@@ -1826,6 +1852,18 @@
         ctx.globalAlpha = 1;
     }
 
+    function drawCenterScore() {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = 'bold 48px "Courier New", monospace';
+        ctx.fillStyle = hexToRgba(theme().accent, 0.16);
+        const gap = 70;
+        ctx.fillText(String(playerScore), WIDTH / 2 - gap, 18);
+        ctx.fillText(String(computerScore), WIDTH / 2 + gap, 18);
+        ctx.restore();
+    }
+
     function drawNet() {
         ctx.strokeStyle = hexToRgba(theme().accent, 0.25);
         ctx.lineWidth = 2;
@@ -1902,6 +1940,7 @@
         ctx.clearRect(-20, -20, WIDTH + 40, HEIGHT + 40);
         drawBackground(t || 0);
         drawNet();
+        drawCenterScore();
         drawTrail();
         drawParticles();
         drawPowerup();
@@ -2409,21 +2448,10 @@
             `;
         }
         if (state === 'comments') {
-            const list = comments.length
-                ? comments.slice().reverse().map(c => `
-                    <div class="comment-item">
-                        <div class="comment-head"><strong>${escapeHTML(c.name)}</strong><span>${escapeHTML(c.time)}</span></div>
-                        <div class="comment-text">${escapeHTML(c.text)}</div>
-                    </div>
-                `).join('')
-                : `<div class="comment-empty">No comments yet — be the first!</div>`;
-            const statusMsg = useFirebase
-                ? '🟢 Live — visible to everyone, on any device, anywhere this game is hosted'
-                : '🟡 Local preview only — add a Firebase config to make this public (see code comments)';
             return `
                 <div class="menu-title small">💬 COMMENTS</div>
-                <div class="menu-stats">${statusMsg}</div>
-                <div class="comment-list">${list}</div>
+                <div class="menu-stats">Visible to everyone who plays this game</div>
+                <div class="comment-list">${commentListHTML()}</div>
                 <input type="text" id="commentName" class="comment-input" placeholder="Your name (optional)" maxlength="24">
                 <textarea id="commentText" class="comment-input comment-textarea" placeholder="Say something about the game..." maxlength="200"></textarea>
                 <button class="menu-btn primary" data-action="postComment">POST COMMENT</button>
@@ -2443,7 +2471,7 @@
         menuOverlay.classList.remove('show');
     }
 
-    menuOverlay.addEventListener('click', function (e) {
+    menuOverlay.addEventListener('click', async function (e) {
         const btn = e.target.closest('[data-action]');
         if (!btn) return;
         ensureAudio();
@@ -2491,13 +2519,12 @@
         } else if (action === 'postComment') {
             const nameEl = document.getElementById('commentName');
             const textEl = document.getElementById('commentText');
-            const name = (nameEl && nameEl.value.trim().slice(0, 24)) || 'Anonymous';
-            const text = textEl ? textEl.value.trim().slice(0, 200) : '';
-            if (!text) {
+            const posted = await postNewComment(nameEl ? nameEl.value : '', textEl ? textEl.value : '');
+            if (!posted) {
                 if (textEl) textEl.focus();
                 return;
             }
-            postComment(name, text);
+            showMenu('comments');
         }
     });
 
@@ -2573,14 +2600,32 @@
         return !!(document.fullscreenElement || document.webkitFullscreenElement);
     }
 
+    // Mirrors the CSS check that hides on-screen paddle buttons on real desktops —
+    // only auto-fullscreen/rotate on touch/mobile-ish devices, never on desktop.
+    function isMobileLike() {
+        return !window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 900px)').matches;
+    }
+
+    function tryLockLandscape() {
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => { /* lock not available/allowed on this browser */ });
+        }
+    }
+
     function enterFullscreen() {
         const el = container;
         const req = el.requestFullscreen || el.webkitRequestFullscreen;
         if (req) {
-            req.call(el).catch(() => { /* some browsers (e.g. iOS Safari) block this silently */ });
-        }
-        if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(() => { /* lock not available/allowed */ });
+            const result = req.call(el);
+            if (result && typeof result.then === 'function') {
+                // Locking right after the fullscreen promise resolves is far more reliable
+                // than firing both requests at once.
+                result.then(tryLockLandscape).catch(() => { /* some browsers (e.g. iOS Safari) block this silently */ });
+            } else {
+                tryLockLandscape();
+            }
+        } else {
+            tryLockLandscape();
         }
     }
 
@@ -2616,6 +2661,7 @@
     document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
     function updateFullscreenBtn() {
         fullscreenBtn.textContent = isFullscreen() ? '⛶ Exit Full Screen' : '⛶ Full Screen';
+        if (isFullscreen() && isMobileLike()) tryLockLandscape();
         if (menuOverlay.dataset.state === 'settings') showMenu('settings');
     }
 
@@ -2634,6 +2680,7 @@
 
     function startGame() {
         ensureAudio();
+        if (isMobileLike() && !isFullscreen()) enterFullscreen();
         hideMenu();
         playerScore = 0;
         computerScore = 0;
@@ -2680,7 +2727,8 @@
     scheduleMusic();
     (async function initStats() {
         stats = await loadStats();
-        subscribeComments();
+        comments = await loadComments();
+        renderPageComments();
         showMenu('main');
     })();
 })();
