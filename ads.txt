@@ -2,4 +2,4 @@ google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
 User-agent: *
 Allow: /
 
-Sitemap: https://YOURUSERNAME.github.io/sitemap.xml
+Sitemap: https://hunainnaeem601.github.io/sitemap.xml
