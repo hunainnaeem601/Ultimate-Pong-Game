@@ -2763,7 +2763,55 @@
 </p>
 
 </footer>
-    <script type="module" src="js/firebase.js"></script>
-<script type="module" src="js/script.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyA3XzqbDpI23r8VSyWi6xksdA4CTsps-kA",
+  authDomain: "ultimate-pong-game.firebaseapp.com",
+  projectId: "ultimate-pong-game",
+  storageBucket: "ultimate-pong-game.firebasestorage.app",
+  messagingSenderId: "289743307536",
+  appId: "1:289743307536:web:f4beb02e3cfe28b6a71b95",
+  measurementId: "G-DYEX4HQ2JN"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+firebase.analytics();
+</script>
+    <script>
+async function saveScore(player, score){
+
+    try{
+
+        await db.collection("leaderboard").add({
+
+            player: player,
+
+            score: score,
+
+            createdAt: Date.now()
+
+        });
+
+        console.log("Score Saved");
+
+    }catch(e){
+
+        console.error(e);
+
+    }
+
+}
+</script>
+    saveScore("Hunain",100);
+    
 </body>
 </html>
