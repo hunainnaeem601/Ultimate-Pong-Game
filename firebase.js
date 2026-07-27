@@ -30,3 +30,72 @@ appId:"YOUR_APP_ID"
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
+import {db} from "./firebase.js";
+
+async function saveScore(name,score){
+
+await addDoc(
+
+collection(db,"scores"),
+
+{
+
+player:name,
+
+score:score,
+
+time:Date.now()
+
+}
+
+);
+
+}
+saveScore(playerName,Player.score);
+async function loadLeaderboard(){
+
+const q=query(
+
+collection(db,"scores"),
+
+orderBy("score","desc"),
+
+limit(10)
+
+);
+
+const snapshot=await getDocs(q);
+
+snapshot.forEach(doc=>{
+
+console.log(doc.data());
+
+});
+
+}
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  limit
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA3XzqbDpI23r8VSyWi6xksdA4CTsps-kA",
+  authDomain: "ultimate-pong-game.firebaseapp.com",
+  projectId: "ultimate-pong-game",
+  storageBucket: "ultimate-pong-game.firebasestorage.app",
+  messagingSenderId: "289743307536",
+  appId: "1:289743307536:web:f4beb02e3cfe28b6a71b95",
+  measurementId: "G-DYEX4HQ2JN"
+};
+
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+export const db = getFirestore(app);
