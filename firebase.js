@@ -1,3 +1,26 @@
+import { db } from "./firebase.js";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy,
+  limit
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+async function saveScore(playerName, score) {
+  try {
+    await addDoc(collection(db, "leaderboard"), {
+      player: playerName,
+      score: score,
+      createdAt: Date.now()
+    });
+
+    console.log("Score saved.");
+  } catch (error) {
+    console.error(error);
+  }
+}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 
 import {
@@ -99,3 +122,44 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
 export const db = getFirestore(app);
+async function loadLeaderboard() {
+
+  const q = query(
+    collection(db, "leaderboard"),
+    orderBy("score", "desc"),
+    limit(10)
+  );
+
+  const snapshot = await getDocs(q);
+
+  const list = document.getElementById("leaderboardList");
+
+  list.innerHTML = "";
+
+  snapshot.forEach(doc => {
+
+    const data = doc.data();
+
+    list.innerHTML += `
+      <li>${data.player} — ${data.score}</li>
+    `;
+
+  });
+
+}
+let playerName = localStorage.getItem("playerName");
+
+if (!playerName) {
+
+  playerName = prompt("Enter your name");
+
+  if (playerName) {
+    localStorage.setItem("playerName", playerName);
+  } else {
+    playerName = "Guest";
+  }
+
+}
+saveScore(playerName, Player.score);
+
+loadLeaderboard();
