@@ -1,0 +1,28 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hunainnaeem601.github.io/Ultimate-Pong-Game/sitemap.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <url>
+    <loc>https://hunainnaeem601.github.io/Ultimate-Pong-Game/</loc>
+  </url>
+
+  <url>
+    <loc>https://hunainnaeem601.github.io/Ultimate-Pong-Game/about.html</loc>
+  </url>
+
+  <url>
+    <loc>https://hunainnaeem601.github.io/Ultimate-Pong-Game/contact.html</loc>
+  </url>
+
+  <url>
+    <loc>https://hunainnaeem601.github.io/Ultimate-Pong-Game/privacy-policy.html</loc>
+  </url>
+
+  <url>
+    <loc>https://hunainnaeem601.github.io/Ultimate-Pong-Game/terms.html</loc>
+  </url>
+
+</urlset>
