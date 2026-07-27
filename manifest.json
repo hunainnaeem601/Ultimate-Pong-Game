@@ -1,0 +1,24 @@
+{
+  "name": "Ultimate Pong Game",
+  "short_name": "Ultimate Pong",
+  "description": "Modern browser-based Pong game with AI, power-ups, achievements and responsive controls.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0b1020",
+  "theme_color": "#00e5ff",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
