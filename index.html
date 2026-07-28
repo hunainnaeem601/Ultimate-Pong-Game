@@ -2183,6 +2183,15 @@
             if (playerScore >= WIN_SCORE) {
     saveScore("Hunain", playerScore);   // Baad me "Hunain" ki jagah playerName use karenge
     loadLeaderboard();
+    if (playerScore >= WIN_SCORE) {
+
+    const playerName = prompt("Enter your name") || "Guest";
+
+    saveScore(playerName, playerScore);
+
+    loadLeaderboard();
+
+}
 }
             recordGameResult(winnerName);
         }
@@ -2818,8 +2827,7 @@ async function saveScore(player, score){
     }
 
 }
-        // TEST
-saveScore("Hunain",100);
+
 </script>
 </body>
 </html>
