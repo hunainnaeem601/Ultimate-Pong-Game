@@ -2180,6 +2180,10 @@
             highlightWinner(winnerName);
             sfxWin();
             vibrate([60, 40, 60, 40, 120]);
+            if (playerScore >= WIN_SCORE) {
+    saveScore("Hunain", playerScore);   // Baad me "Hunain" ki jagah playerName use karenge
+    loadLeaderboard();
+}
             recordGameResult(winnerName);
         }
     }
