@@ -1150,6 +1150,10 @@
 
         <div class="game-board">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
+            <div id="leaderboard">
+    <h2>🏆 Global Leaderboard</h2>
+    <ul id="leaderboardList"></ul>
+</div>
             <div class="center-overlay" id="centerOverlay"></div>
             <div class="toast" id="toastEl"></div>
             <div class="menu-overlay" id="menuOverlay">
@@ -2167,7 +2171,7 @@
         }
     }
 
-    function checkWin() {
+    async function checkWin() {
         if (playerScore >= WIN_SCORE || computerScore >= WIN_SCORE) {
             running = false;
             paused = false;
@@ -2800,8 +2804,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const db = firebase.firestore();
-
-firebase.analytics();
+// firebase.analytics();;
 </script>
     <script>
 async function saveScore(player, score){
@@ -2825,6 +2828,38 @@ async function saveScore(player, score){
         console.error(e);
 
     }
+
+}
+async function loadLeaderboard() {
+
+    const snapshot = await db
+        .collection("leaderboard")
+        .orderBy("score", "desc")
+        .limit(10)
+        .get();
+
+    const list = document.getElementById("leaderboardList");
+
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    snapshot.forEach((doc, index) => {
+
+        const data = doc.data();
+
+        list.innerHTML += `
+            <li>#${index + 1} ${data.player} - ${data.score}</li>
+        `;
+
+    });
+
+}
+
+// 👇 YE LINE ADD KARO
+loadLeaderboard();
+
+</script>
 
 }
 
