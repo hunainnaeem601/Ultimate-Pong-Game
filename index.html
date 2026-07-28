@@ -1113,6 +1113,7 @@
         margin: 0;
     }
 }
+
 </style>
 </head>
 <body>
@@ -1150,10 +1151,10 @@
 
         <div class="game-board">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
-            <div id="leaderboard">
+            <div id="leaderboard" class="leaderboard">
     <h2>🏆 Global Leaderboard</h2>
     <ul id="leaderboardList"></ul>
-</div>
+</div>   
             <div class="center-overlay" id="centerOverlay"></div>
             <div class="toast" id="toastEl"></div>
             <div class="menu-overlay" id="menuOverlay">
@@ -2780,10 +2781,6 @@
 </p>
 
 </footer>
-    <div id="leaderboard" style="margin-top:20px;">
-    <h2>🏆 Global Leaderboard</h2>
-    <ul id="leaderboardList"></ul>
-</div>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
