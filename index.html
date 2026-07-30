@@ -2193,35 +2193,34 @@
             showToast('🔥 ' + (twoPlayerMode ? 'PLAYER 2' : 'COMPUTER') + ' COMEBACK!', 2400);
         }
     }
+async function checkWin() {
+    if (playerScore >= WIN_SCORE || computerScore >= WIN_SCORE) {
 
-    async function checkWin() {
-        if (playerScore >= WIN_SCORE || computerScore >= WIN_SCORE) {
-            running = false;
-            paused = false;
-            pauseBtn.textContent = '⏸ Pause';
-            const winnerName = playerScore >= WIN_SCORE
-                ? (twoPlayerMode ? 'Player 1' : 'Player')
-                : (twoPlayerMode ? 'Player 2' : 'Computer');
-            winnerMsg.textContent = `🏆 ${winnerName} wins!`;
-            startBtn.textContent = '▶ Start Game';
-            highlightWinner(winnerName);
-            sfxWin();
-            vibrate([60, 40, 60, 40, 120]);
-           if (playerScore >= WIN_SCORE) {
+        running = false;
+        paused = false;
+        pauseBtn.textContent = '⏸ Pause';
 
-    const playerName = prompt("Enter your name") || "Guest";
+        const winnerName = playerScore >= WIN_SCORE
+            ? (twoPlayerMode ? 'Player 1' : 'Player')
+            : (twoPlayerMode ? 'Player 2' : 'Computer');
 
-    await saveScore(playerName, playerScore);
+        winnerMsg.textContent = `🏆 ${winnerName} wins!`;
+        startBtn.textContent = '▶ Start Game';
 
-    await loadLeaderboard();
+        highlightWinner(winnerName);
+        sfxWin();
+        vibrate([60, 40, 60, 40, 120]);
 
-}
-
-}
-}
-            recordGameResult(winnerName);
+        if (playerScore >= WIN_SCORE) {
+            const playerName = prompt("Enter your name") || "Guest";
+            await saveScore(playerName, playerScore);
+            await loadLeaderboard();
         }
+
+        recordGameResult(winnerName);
     }
+}
+ 
 
     function loop(t) {
         update();
