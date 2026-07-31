@@ -1015,7 +1015,11 @@
 
     .game-board {
         margin-bottom: 8px;
-    }
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+    
 
     canvas {
         max-height: 58vh;
@@ -1113,28 +1117,71 @@
         margin: 0;
     }
 }
-.leaderboard{
-    width:350px;
-    margin:20px auto;
-    padding:15px;
-    background:#111;
-    color:#fff;
-    border-radius:12px;
-    border:2px solid #00e5ff;
+.leaderboard {
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto 24px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+    border-radius: 14px;
+    border: 1px solid #2b3560;
+    box-sizing: border-box;
+    text-align: left;
 }
 
-.leaderboard h2{
-    text-align:center;
+.leaderboard h2 {
+    font-size: 0.9rem;
+    letter-spacing: 0.05rem;
+    color: var(--accent);
+    margin-bottom: 10px;
 }
 
-.leaderboard ul{
-    list-style:none;
-    padding:0;
+#leaderboardList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 260px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-.leaderboard li{
-    padding:8px;
-    border-bottom:1px solid #333;
+#leaderboardList li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 4px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+#leaderboardList li:last-child {
+    border-bottom: none;
+}
+
+#leaderboardList li.lb-empty {
+    color: var(--muted);
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+#leaderboardList li.lb-top1 .lb-rank { color: #ffd97c; }
+#leaderboardList li .lb-rank { flex: 0 0 auto; color: var(--muted); min-width: 28px; }
+#leaderboardList li .lb-name { flex: 1; word-break: break-word; }
+#leaderboardList li .lb-score { flex: 0 0 auto; font-weight: bold; color: var(--accent); }
+
+body.game-active .leaderboard {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .leaderboard {
+        margin-bottom: 90px;
+        padding: 12px 14px;
+    }
+    #leaderboardList {
+        max-height: 200px;
+    }
 }
 </style>
 </head>
@@ -1173,15 +1220,16 @@
 
         <div class="game-board">
             <canvas id="gameCanvas" width="800" height="400"></canvas>
-            <div id="leaderboard" class="leaderboard">
-    <h2>🏆 Global Leaderboard</h2>
-    <ul id="leaderboardList"></ul>
-</div>   
             <div class="center-overlay" id="centerOverlay"></div>
             <div class="toast" id="toastEl"></div>
             <div class="menu-overlay" id="menuOverlay">
                 <div class="menu-panel" id="menuPanel"></div>
             </div>
+        </div>
+
+        <div id="leaderboard" class="leaderboard">
+            <h2>🏆 Global Leaderboard</h2>
+            <ul id="leaderboardList"><li class="lb-empty">Loading leaderboard…</li></ul>
         </div>
 
         <div class="mobile-controls" id="mobileControls">
@@ -1450,6 +1498,56 @@
 
     // ---------- High score / stats persistence ----------
     let stats = { bestRally: 0, wins: 0, losses: 0, gamesPlayed: 0 };
+    let savedPlayerName = '';
+    let pendingWinData = {};
+
+    async function loadPlayerName() {
+        try {
+            if (window.storage) {
+                const res = await window.storage.get('pong-player-name', false);
+                if (res && res.value) return res.value;
+            }
+        } catch (e) {
+            // no saved name yet
+        }
+        return '';
+    }
+
+    async function savePlayerName(name) {
+        try {
+            if (window.storage) {
+                await window.storage.set('pong-player-name', name, false);
+            }
+        } catch (e) {
+            console.error('Could not save player name', e);
+        }
+    }
+
+    // ---------- Settings persistence ----------
+    async function loadSettings() {
+        const fallback = { soundOn: true, musicOn: true, masterVolume: 1, screenShakeEnabled: true, particlesEnabled: true };
+        try {
+            if (window.storage) {
+                const res = await window.storage.get('pong-settings', false);
+                if (res && res.value) return Object.assign(fallback, JSON.parse(res.value));
+            }
+        } catch (e) {
+            // no saved settings yet
+        }
+        return fallback;
+    }
+
+    async function saveSettings() {
+        try {
+            if (window.storage) {
+                await window.storage.set('pong-settings', JSON.stringify({
+                    soundOn, musicOn, masterVolume, screenShakeEnabled, particlesEnabled
+                }), false);
+            }
+        } catch (e) {
+            console.error('Could not save settings', e);
+        }
+    }
 
     async function loadStats() {
         const fallback = { bestRally: 0, wins: 0, losses: 0, gamesPlayed: 0 };
@@ -2193,7 +2291,7 @@
             showToast('🔥 ' + (twoPlayerMode ? 'PLAYER 2' : 'COMPUTER') + ' COMEBACK!', 2400);
         }
     }
-async function checkWin() {
+function checkWin() {
     if (playerScore >= WIN_SCORE || computerScore >= WIN_SCORE) {
 
         running = false;
@@ -2203,6 +2301,7 @@ async function checkWin() {
         const winnerName = playerScore >= WIN_SCORE
             ? (twoPlayerMode ? 'Player 1' : 'Player')
             : (twoPlayerMode ? 'Player 2' : 'Computer');
+        const winnerScore = playerScore >= WIN_SCORE ? playerScore : computerScore;
 
         winnerMsg.textContent = `🏆 ${winnerName} wins!`;
         startBtn.textContent = '▶ Start Game';
@@ -2211,13 +2310,15 @@ async function checkWin() {
         sfxWin();
         vibrate([60, 40, 60, 40, 120]);
 
-        if (playerScore >= WIN_SCORE) {
-            const playerName = prompt("Enter your name") || "Guest";
-            await saveScore(playerName, playerScore);
-            await loadLeaderboard();
-        }
+        // Only a real person can appear on the leaderboard: in 1-player mode that's
+        // the left paddle; in 2-player mode either side is a human.
+        const isHumanWinner = twoPlayerMode || playerScore >= WIN_SCORE;
 
-        recordGameResult(winnerName);
+        if (isHumanWinner && typeof db !== 'undefined' && db) {
+            showMenu('nameentry', { winner: winnerName, score: winnerScore });
+        } else {
+            recordGameResult(winnerName);
+        }
     }
 }
  
@@ -2352,6 +2453,12 @@ async function checkWin() {
 
     pauseBtn.addEventListener('click', togglePause);
 
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden && running && !paused) {
+            togglePause();
+        }
+    });
+
     function setSoundEnabled(val) {
         soundOn = val;
         muteBtn.textContent = soundOn ? '🔊 Sound' : '🔇 Muted';
@@ -2451,11 +2558,26 @@ async function checkWin() {
                 <button class="menu-btn" data-action="menu">☰ MAIN MENU</button>
             `;
         }
+        if (state === 'nameentry') {
+            const safeName = escapeHTML(savedPlayerName || '');
+            return `
+                <div class="menu-title small">🏆 ${escapeHTML(data.winner)} WINS!</div>
+                <div class="menu-stats">Score: <strong>${data.score}</strong> — save it to the global leaderboard</div>
+                <input type="text" id="nameEntryInput" class="comment-input" placeholder="Your name" maxlength="24" value="${safeName}" autocomplete="off">
+                <button class="menu-btn primary" data-action="submitName">✅ SAVE SCORE</button>
+                <button class="menu-btn" data-action="skipName">SKIP</button>
+            `;
+        }
         if (state === 'settings') {
             return `
                 <div class="menu-title small">⚙️ SETTINGS</div>
                 <div class="settings-row">
-                    <span class="settings-label">🔊 Volume</span>
+                    <span class="settings-label" style="flex:none">👤 Name</span>
+                    <input type="text" id="playerNameInput" class="comment-input" style="flex:1 1 auto;padding:8px 10px" placeholder="Your name" maxlength="24" value="${escapeHTML(savedPlayerName || '')}">
+                </div>
+                <div class="settings-divider"></div>
+                <div class="settings-row">
+                    <span class="settings-label">🔊 Volume (${Math.round(masterVolume * 100)}%)</span>
                     <input type="range" id="volumeSlider" class="settings-slider" min="0" max="100" value="${Math.round(masterVolume * 100)}">
                 </div>
                 <div class="settings-row">
@@ -2507,9 +2629,23 @@ async function checkWin() {
     }
 
     function showMenu(state, data) {
+        if (state === 'nameentry') pendingWinData = data || {};
         menuPanel.innerHTML = menuHTML(state, data);
         menuOverlay.classList.add('show');
         menuOverlay.dataset.state = state;
+        if (state === 'nameentry') {
+            const input = document.getElementById('nameEntryInput');
+            if (input) {
+                input.focus();
+                input.select();
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        menuPanel.querySelector('[data-action="submitName"]').click();
+                    }
+                });
+            }
+        }
     }
 
     function hideMenu() {
@@ -2542,15 +2678,19 @@ async function checkWin() {
             showMenu('settings');
         } else if (action === 'toggleSound') {
             setSoundEnabled(!soundOn);
+            saveSettings();
             showMenu('settings');
         } else if (action === 'toggleMusic') {
             setMusicEnabled(!musicOn);
+            saveSettings();
             showMenu('settings');
         } else if (action === 'toggleShake') {
             screenShakeEnabled = !screenShakeEnabled;
+            saveSettings();
             showMenu('settings');
         } else if (action === 'toggleParticles') {
             particlesEnabled = !particlesEnabled;
+            saveSettings();
             showMenu('settings');
         } else if (action === 'resetStats') {
             stats = { bestRally: 0, wins: 0, losses: 0, gamesPlayed: 0 };
@@ -2570,6 +2710,18 @@ async function checkWin() {
                 return;
             }
             showMenu('comments');
+        } else if (action === 'submitName') {
+            const input = document.getElementById('nameEntryInput');
+            const winner = pendingWinData.winner;
+            const score = pendingWinData.score;
+            const name = (input && input.value.trim()) || 'Guest';
+            savedPlayerName = name;
+            await savePlayerName(name);
+            await saveScore(name, score);
+            await loadLeaderboard();
+            recordGameResult(winner);
+        } else if (action === 'skipName') {
+            recordGameResult(pendingWinData.winner);
         }
     });
 
@@ -2578,6 +2730,17 @@ async function checkWin() {
             masterVolume = Number(e.target.value) / 100;
             ensureAudio();
             setMusicGain(true);
+            const label = e.target.closest('.settings-row').querySelector('.settings-label');
+            if (label) label.textContent = `🔊 Volume (${Math.round(masterVolume * 100)}%)`;
+        }
+    });
+
+    menuOverlay.addEventListener('change', async function (e) {
+        if (e.target && e.target.id === 'volumeSlider') {
+            saveSettings();
+        } else if (e.target && e.target.id === 'playerNameInput') {
+            savedPlayerName = e.target.value.trim();
+            await savePlayerName(savedPlayerName);
         }
     });
 
@@ -2773,6 +2936,15 @@ async function checkWin() {
     (async function initStats() {
         stats = await loadStats();
         comments = await loadComments();
+        savedPlayerName = await loadPlayerName();
+        const s = await loadSettings();
+        soundOn = s.soundOn;
+        musicOn = s.musicOn;
+        masterVolume = s.masterVolume;
+        screenShakeEnabled = s.screenShakeEnabled;
+        particlesEnabled = s.particlesEnabled;
+        setSoundEnabled(soundOn);
+        setMusicEnabled(musicOn);
         renderPageComments();
         showMenu('main');
     })();
@@ -2818,62 +2990,90 @@ const firebaseConfig = {
   measurementId: "G-DYEX4HQ2JN"
 };
 
-firebase.initializeApp(firebaseConfig);
-
-const db = firebase.firestore();
-// firebase.analytics();;
+let db = null;
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+} catch (e) {
+    console.error('Firebase failed to initialize — leaderboard will be unavailable', e);
+}
 </script>
     <script>
-async function saveScore(player, score){
-
-    try{
-
+async function saveScore(player, score) {
+    if (!db) return false;
+    try {
         await db.collection("leaderboard").add({
-
-            player: player,
-
-            score: score,
-
+            player: String(player || "Guest").slice(0, 24),
+            score: Number(score) || 0,
             createdAt: Date.now()
-
         });
-
-        console.log("Score Saved");
-
-    }catch(e){
-
-        console.error(e);
-
+        return true;
+    } catch (e) {
+        console.error("Could not save score", e);
+        return false;
     }
-
 }
-async function loadLeaderboard() {
 
-    const snapshot = await db
-        .collection("leaderboard")
-        .orderBy("score", "desc")
-        .limit(10)
-        .get();
-
+function renderLeaderboardMessage(text) {
     const list = document.getElementById("leaderboardList");
+    if (!list) return;
+    list.innerHTML = "";
+    const li = document.createElement("li");
+    li.className = "lb-empty";
+    li.textContent = text;
+    list.appendChild(li);
+}
 
+async function loadLeaderboard() {
+    const list = document.getElementById("leaderboardList");
     if (!list) return;
 
-    list.innerHTML = "";
+    if (!db) {
+        renderLeaderboardMessage("Leaderboard unavailable right now.");
+        return;
+    }
 
-    snapshot.forEach((doc, index) => {
+    try {
+        const snapshot = await db
+            .collection("leaderboard")
+            .orderBy("score", "desc")
+            .limit(10)
+            .get();
 
-        const data = doc.data();
+        if (snapshot.empty) {
+            renderLeaderboardMessage("No scores yet — be the first!");
+            return;
+        }
 
-        list.innerHTML += `
-            <li>#${index + 1} ${data.player} - ${data.score}</li>
-        `;
+        list.innerHTML = "";
+        snapshot.forEach((doc, index) => {
+            const data = doc.data() || {};
+            const li = document.createElement("li");
+            if (index === 0) li.classList.add("lb-top1");
 
-    });
+            const rank = document.createElement("span");
+            rank.className = "lb-rank";
+            rank.textContent = "#" + (index + 1);
 
+            const name = document.createElement("span");
+            name.className = "lb-name";
+            name.textContent = data.player == null ? "Guest" : String(data.player);
+
+            const score = document.createElement("span");
+            score.className = "lb-score";
+            score.textContent = String(data.score == null ? 0 : data.score);
+
+            li.appendChild(rank);
+            li.appendChild(name);
+            li.appendChild(score);
+            list.appendChild(li);
+        });
+    } catch (e) {
+        console.error("Could not load leaderboard", e);
+        renderLeaderboardMessage("Couldn't load the leaderboard. Check your connection.");
+    }
 }
 
-// 👇 YE LINE ADD KARO
 loadLeaderboard();
 </script>
 </body>
