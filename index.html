@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1326,6 +1327,90 @@ body.game-active .leaderboard {
     }
 
 }
+@media (max-width: 768px) {
+    .leaderboard {
+        margin-bottom: 90px;
+        padding: 12px 14px;
+    }
+
+    #leaderboardList {
+        max-height: 200px;
+    }
+}
+
+/* 👇 YAHAN PASTE KARO */
+
+@media (max-width:768px){
+
+    body{
+        padding:0;
+        margin:0;
+        overflow-x:hidden;
+    }
+
+    .container{
+        width:100%;
+        max-width:100%;
+        padding:8px;
+    }
+
+    canvas{
+        width:100% !important;
+        height:auto !important;
+        display:block;
+        margin:0 auto;
+    }
+
+    .scoreboard{
+        width:100%;
+        flex-wrap:wrap;
+        justify-content:center;
+        gap:8px;
+    }
+
+    .score{
+        min-width:70px;
+    }
+
+    .score-value{
+        font-size:2rem;
+    }
+
+    .controls-row{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+    }
+
+    .controls-row button{
+        width:100%;
+    }
+
+    .leaderboard{
+        width:100%;
+        max-width:100%;
+    }
+
+    #leaderboardList{
+        max-height:180px;
+    }
+}
+
+/* Footer (About / Privacy Policy / Contact / Terms) always sits as the very
+   last thing on the page. On mobile the main controls become a fixed bottom
+   toolbar, so the footer needs extra bottom clearance or that toolbar would
+   cover it. */
+.site-footer {
+    position: relative;
+    z-index: 1;
+    margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+    .site-footer {
+        margin-bottom: calc(80px + env(safe-area-inset-bottom));
+    }
+}
 
 </style>
 </head>
@@ -1668,36 +1753,19 @@ ctx.imageSmoothingEnabled = false;
                 await window.storage.set('pong-player-name', name, false);
             }
         } catch (e) {
-       let name = (input && input.value.trim()) || "Guest";
-
-// Remove extra spaces
-name = name.replace(/\s+/g, " ");
-
-if (name.length > 20) {
-    name = name.substring(0, 20);
-}
-
-const blocked = ["admin", "administrator", "owner"];
-
-if (blocked.includes(name.toLowerCase())) {
-    name = "Guest";
-}
-
-savedPlayerName = name;
-
-await savePlayerName(name);
-
-await saveScore(name, score);
-
-if (playerName.length < 3) {
-    playerName = "Guest";
-}
-
-if (playerName.length > 20) {
-    playerName = playerName.substring(0, 20);
-}
-        const playerName = nameInput.value;
+            console.error('Could not save player name', e);
         }
+    }
+
+    // Sanitizes a raw name string for display/storage/leaderboard use:
+    // trims, collapses whitespace, caps length, and blocks reserved names.
+    function sanitizePlayerName(raw) {
+        let name = (raw || '').trim() || 'Guest';
+        name = name.replace(/\s+/g, ' ');
+        if (name.length > 20) name = name.substring(0, 20);
+        const blocked = ['admin', 'administrator', 'owner'];
+        if (blocked.includes(name.toLowerCase())) name = 'Guest';
+        return name;
     }
 
     // ---------- Settings persistence ----------
@@ -2332,35 +2400,27 @@ if (playerName.length > 20) {
             computerY = Math.max(0, Math.min(HEIGHT - computerPaddleHeight, computerY));
         }
         else {
-    // AI Prediction
-    let predictedY = ballY + (ballSpeedY * 8);
+            // Single AI implementation (1-player mode only): predicts where the ball
+            // will be, adds difficulty-based imprecision (diff.error), and moves at
+            // the difficulty's speed plus a per-level boost via currentCompSpeed().
+            const diff = DIFFICULTIES[currentDifficulty];
+            let predictedY = ballY + (ballSpeedY * 8);
+            predictedY = Math.max(
+                computerPaddleHeight / 2,
+                Math.min(HEIGHT - computerPaddleHeight / 2, predictedY)
+            );
 
-    predictedY = Math.max(
-        computerPaddleHeight / 2,
-        Math.min(HEIGHT - computerPaddleHeight / 2, predictedY)
-    );
+            let targetY = predictedY - computerPaddleHeight / 2;
+            if (diff.error > 0) {
+                targetY += (Math.random() - 0.5) * diff.error * 2;
+            }
 
-    let targetY = predictedY - computerPaddleHeight / 2;
+            const aiSpeed = currentCompSpeed();
+            computerY += Math.sign(targetY - computerY) *
+                         Math.min(Math.abs(targetY - computerY), aiSpeed);
 
-    // Easy & Medium mistakes
-    if (currentDifficulty !== "hard") {
-        targetY += (Math.random() - 0.5) * 30;
-    }
-
-    // AI Speed
-    const aiSpeed =
-        currentDifficulty === "easy" ? 4 :
-        currentDifficulty === "medium" ? 6 : 8;
-
-    computerY += Math.sign(targetY - computerY) *
-                 Math.min(Math.abs(targetY - computerY), aiSpeed);
-
-    // Keep inside screen
-    computerY = Math.max(
-        0,
-        Math.min(HEIGHT - computerPaddleHeight, computerY)
-    );
-}
+            computerY = Math.max(0, Math.min(HEIGHT - computerPaddleHeight, computerY));
+        }
 
         let speedFactor = 1;
         if (ballSlowUntil && Date.now() < ballSlowUntil) speedFactor = 0.55;
@@ -2466,20 +2526,6 @@ if (playerName.length > 20) {
             updateLevel();
             checkWin();
             if (running) resetBall(-1);
-        }
-
-        // computer AI (only in 1-player mode)
-        if (!twoPlayerMode) {
-            const diff = DIFFICULTIES[currentDifficulty];
-            const compCenter = computerY + computerPaddleHeight / 2;
-            const target = ballY;
-            const compSpeed = currentCompSpeed();
-            if (compCenter < target - diff.error) {
-                computerY += compSpeed;
-            } else if (compCenter > target + diff.error) {
-                computerY -= compSpeed;
-            }
-            computerY = Math.max(0, Math.min(HEIGHT - computerPaddleHeight, computerY));
         }
     }
 
@@ -2948,36 +2994,17 @@ canvas.addEventListener("mousemove",(e)=>{
             const submitBtn = document.querySelector('[data-action="submitName"]');
             if (submitBtn) submitBtn.disabled = true;
 
-await saveScore(name, score);
-await loadLeaderboard();
-
-if (submitBtn) submitBtn.disabled = false;
             const input = document.getElementById('nameEntryInput');
             const winner = pendingWinData.winner;
             const score = pendingWinData.score;
-          let name = (input && input.value.trim()) || "Guest";
+            const name = sanitizePlayerName(input ? input.value : '');
 
-// Remove extra spaces
-name = name.replace(/\s+/g, " ");
-
-// Limit length
-if (name.length > 20) {
-    name = name.substring(0, 20);
-}
-
-// Reserved names
-const blocked = ["admin", "administrator", "owner"];
-
-if (blocked.includes(name.toLowerCase())) {
-    name = "Guest";
-}
-
-savedPlayerName = name;
-
-await savePlayerName(name);
-
-await saveScore(name, score);
+            savedPlayerName = name;
+            await savePlayerName(name);
+            await saveScore(name, score);
             await loadLeaderboard();
+
+            if (submitBtn) submitBtn.disabled = false;
             recordGameResult(winner);
         } else if (action === 'skipName') {
             recordGameResult(pendingWinData.winner);
@@ -3134,6 +3161,14 @@ await saveScore(name, score);
 
     let resizeTimer;
 
+    // The canvas's internal resolution (WIDTH/HEIGHT) stays fixed — CSS handles
+    // scaling it to fit the screen — so there's no geometry to recompute here.
+    // We still redraw once after a resize settles so the frame reflects the
+    // current layout/theme immediately rather than waiting for the next tick.
+    function resizeCanvas() {
+        draw();
+    }
+
 window.addEventListener("resize", () => {
 
     clearTimeout(resizeTimer);
@@ -3216,7 +3251,7 @@ window.addEventListener("resize", () => {
     })();
 })();
 </script>
-    <footer style="text-align:center;padding:30px;color:white;background:#111;">
+    <footer class="site-footer" style="text-align:center;padding:30px;color:white;background:#111;">
 
 <hr>
 
